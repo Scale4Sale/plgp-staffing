@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Staffing Planner — PLGP</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --page: #f9f9f7;
+    --ink-1: #0b0b0b;
+    --ink-2: #52514e;
+    --ink-muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --seq-250: #86b6ef;
+    --seq-350: #5598e7;
+    --seq-450: #2a78d6;
+    --seq-550: #1c5cab;
+    --accent: #2a78d6;
+    --serious: #ec835a;
+    --serious-wash: rgba(236,131,90,0.12);
+    --critical: #d03b3b;
+    --critical-wash: rgba(208,59,59,0.08);
+    --good: #0ca30c;
+    --chip-bg: #f0efec;
+    --note-bg: #f5f4f0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface-1: #1a1a19;
+      --page: #0d0d0d;
+      --ink-1: #ffffff;
+      --ink-2: #c3c2b7;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255,255,255,0.10);
+      --seq-250: #1c5cab;
+      --seq-350: #256abf;
+      --seq-450: #3987e5;
+      --seq-550: #6da7ec;
+      --accent: #3987e5;
+      --serious-wash: rgba(236,131,90,0.16);
+      --critical-wash: rgba(208,59,59,0.14);
+      --chip-bg: #2c2c2a;
+      --note-bg: #232322;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page); color: var(--ink-1);
+    padding: 28px 20px 64px; line-height: 1.45;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 16px; }
+  header h1 { font-size: 21px; font-weight: 650; letter-spacing: -0.01em; }
+  header .sub { color: var(--ink-2); font-size: 13px; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 6px; align-items: center; }
+  .btn {
+    font: inherit; font-size: 12.5px; font-weight: 600; color: var(--ink-1);
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px 12px; cursor: pointer;
+  }
+  .btn:hover { border-color: var(--baseline); }
+  .btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
+  .toolbar .hint { font-size: 12px; color: var(--ink-muted); margin-left: 4px; }
+  .flash { font-size: 12px; color: var(--good); font-weight: 600; display: none; }
+
+  .layout { display: grid; grid-template-columns: 240px 1fr; gap: 16px; margin-top: 12px; align-items: start; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+
+  .bench { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px; position: sticky; top: 12px; max-height: calc(100vh - 40px); overflow: auto; }
+  .bench h2 { font-size: 13.5px; font-weight: 650; margin-bottom: 2px; }
+  .bench .h-sub { font-size: 11.5px; color: var(--ink-muted); margin-bottom: 10px; }
+  .bench-rep { display: flex; align-items: center; gap: 7px; padding: 4px 2px; border-radius: 8px; }
+  .bench-rep .shows { font-size: 10.5px; color: var(--ink-muted); flex: 1; text-align: right; line-height: 1.3; }
+  .bench-rep .shows .freed { color: var(--serious); font-weight: 650; }
+
+  .board { display: grid; grid-template-columns: repeat(auto-fill, minmax(255px, 1fr)); gap: 12px; }
+  .month-break { grid-column: 1 / -1; font-size: 12px; font-weight: 650; color: var(--ink-muted); text-transform: uppercase; letter-spacing: .06em; margin: 6px 0 -4px; }
+
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 12px 10px; transition: box-shadow .12s, border-color .12s; position: relative;
+  }
+  .card.drop-ok { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  .card.drop-warn { border-color: var(--serious); box-shadow: 0 0 0 2px var(--serious); }
+  .card.cancelled { background: transparent; border-style: dashed; }
+  .card.cancelled .name { text-decoration: line-through; color: var(--ink-muted); }
+  .card .head { display: flex; align-items: flex-start; gap: 8px; }
+  .card .name { font-size: 13.5px; font-weight: 650; flex: 1; }
+  .card .dates { font-size: 11.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .card .booth { font-size: 10.5px; color: var(--ink-muted); }
+  .count {
+    min-width: 26px; height: 22px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #fff; padding: 0 6px;
+  }
+  .count.zero { background: transparent; color: var(--critical); border: 1.5px dashed var(--critical); }
+  .count.lean { background: var(--serious); color: #40140a; }
+  .cancel-note { font-size: 10.5px; color: var(--serious); font-weight: 650; margin-top: 2px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; min-height: 26px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--chip-bg); border-radius: 20px; padding: 2.5px 6px 2.5px 10px;
+    font-size: 12px; cursor: grab; user-select: -webkit-user-select; user-select: none; border: 1px solid transparent;
+  }
+  .chip:active { cursor: grabbing; }
+  .chip.conflict { border-color: var(--serious); background: var(--serious-wash); }
+  .chip.selected { border-color: var(--accent); box-shadow: 0 0 0 1.5px var(--accent); }
+  .chip.ghost { opacity: .45; text-decoration: line-through; cursor: grab; }
+  .chip.ghost.covered { text-decoration: none; opacity: .3; }
+  .chip .x {
+    width: 15px; height: 15px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px; line-height: 1; color: var(--ink-muted); cursor: pointer; font-weight: 700;
+  }
+  .chip .x:hover { background: var(--critical); color: #fff; }
+  .chip.bench-chip { padding: 2.5px 10px; }
+  .card .toggle {
+    font: inherit; font-size: 10.5px; font-weight: 650; color: var(--ink-muted);
+    background: none; border: 1px solid var(--border); border-radius: 6px; padding: 2px 7px; cursor: pointer; margin-top: 8px;
+  }
+  .card .toggle:hover { color: var(--critical); border-color: var(--critical); }
+  .card.cancelled .toggle:hover { color: var(--good); border-color: var(--good); }
+  .conflict-note { font-size: 10.5px; color: var(--serious); margin-top: 6px; line-height: 1.4; }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 2px; font-size: 12px; color: var(--ink-2); align-items: center; }
+  .legend .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1.5px; }
+  footer { margin-top: 26px; font-size: 12px; color: var(--ink-muted); }
+  footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Staffing Planner</h1>
+    <span class="sub">Drag reps between shows · Wisconsin, Big E &amp; Bloomsburg start as cancelled · changes live in the page link</span>
+  </header>
+  <div class="toolbar">
+    <button class="btn primary" id="copyBtn">Copy scenario link</button>
+    <button class="btn" id="resetBtn">Reset to sheet</button>
+    <a class="btn" href="./" style="text-decoration:none">← Timeline view</a>
+    <span class="flash" id="flash">Link copied</span>
+    <span class="hint">Drag a name onto a show — or click a name, then click a show. × removes. Drops that double-book get flagged, not blocked.</span>
+  </div>
+
+  <div class="layout">
+    <div class="bench">
+      <h2>Bench — all reps</h2>
+      <div class="h-sub">Drag onto any show to add. Orange = freed by a cancelled show.</div>
+      <div id="bench"></div>
+    </div>
+    <div>
+      <div class="board" id="board"></div>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--seq-250)"></span>4–5</span>
+        <span><span class="sw" style="background:var(--seq-350)"></span>6–7</span>
+        <span><span class="sw" style="background:var(--seq-450)"></span>8–9</span>
+        <span><span class="sw" style="background:var(--seq-550)"></span>10+</span>
+        <span><span class="sw" style="background:var(--serious)"></span>Lean (≤3)</span>
+        <span><span class="sw" style="border:1.5px dashed var(--critical); background:transparent"></span>Zero / cancelled</span>
+        <span><span class="sw" style="border:1.5px solid var(--serious); background:var(--serious-wash)"></span>Double-booked on overlapping dates</span>
+      </div>
+    </div>
+  </div>
+
+  <footer>Baseline from the "Sheet1" tab of the PLGP Staffing spreadsheet · Heather excluded · Scenario state is saved in the URL — copy the link to share or bookmark a plan. <a href="./">Timeline view</a></footer>
+</div>
+
+<script>
+"use strict";
+// ---------- baseline data (from the sheet) ----------
+const SHOWS = [
+  { id:"nd",  name:"ND State Fair",        s:"2026-07-17", e:"2026-07-25", crew:["Veronica","Jojo","Graham","Sage","Alivia"] },
+  { id:"oh",  name:"Ohio State Fair",      s:"2026-07-29", e:"2026-08-09", crew:["Sage","Samuel","Cody","Bobby","Ashley","Holly","Anthony","Veronica","Alex","Matteo","Fareed"], note:"Bobby & Veronica week 1 only" },
+  { id:"wi",  name:"Wisconsin State Fair", s:"2026-08-06", e:"2026-08-16", crew:["Graham","Veronica","Jojo","Riya","Alex","Nino","Ashley"], note:"Veronica through 8/11 only" },
+  { id:"ia",  name:"Iowa State Fair",      s:"2026-08-13", e:"2026-08-23", crew:["Anthony","Alivia","Cody","Jared","Matteo","Jojo","Alex","Bobby"], note:"Jojo, Alex, Bobby join wk 2" },
+  { id:"mid", name:"Midland County Fair",  s:"2026-08-20", e:"2026-08-23", booth:"10×20", crew:["Veronica","Nicole L","Alivia","Nino","Sage"] },
+  { id:"ovc", name:"Overland Expo MW (CO)",s:"2026-08-21", e:"2026-08-23", booth:"20×30 — biggest booth", crew:["Holly","Jared"] },
+  { id:"ny",  name:"NY State Fair",        s:"2026-08-26", e:"2026-09-07", booth:"10×20 · “HEAVY HITTERS”", crew:["Graham","Ashley","Alysha","Anthony","Cody","Matteo"], note:"Matteo wk 2 only" },
+  { id:"col", name:"Columbia County Fair", s:"2026-09-02", e:"2026-09-06", booth:"10×8", crew:[] },
+  { id:"mi",  name:"Michigan State Fair",  s:"2026-09-03", e:"2026-09-07", booth:"10×10", crew:[] },
+  { id:"ks",  name:"Kansas State Fair",    s:"2026-09-11", e:"2026-09-20", crew:["Veronica","Holly","Jojo","Bobby","Riya","Jared","Cody","Sage","Alex","Matteo","Alysha","Anthony"], note:"Anthony wk 2 only" },
+  { id:"bige",name:"The Big E",            s:"2026-09-18", e:"2026-10-04", crew:["Graham","Matteo","Roy","Alex","Alysha","Cody"] },
+  { id:"blm", name:"Bloomsburg",           s:"2026-09-25", e:"2026-10-02", crew:["Jared","Veronica","Jojo","Nicole L","Ashley","Holly","Anthony","Sage"] },
+  { id:"ove", name:"Overland East",        s:"2026-10-23", e:"2026-10-25", crew:["Jared","Veronica","Cody"] },
+];
+const ABBR = { nd:"ND", oh:"OH", wi:"WI", ia:"IA", mid:"MID", ovc:"OV-CO", ny:"NY", col:"COL", mi:"MI", ks:"KS", bige:"BigE", blm:"BLM", ove:"OV-E" };
+const DEFAULT_CANCELLED = ["wi","bige","blm"];
+const ALL_REPS = [...new Set(SHOWS.flatMap(s => s.crew))].sort((a,b) => a.localeCompare(b));
+
+const D = s => new Date(s + "T00:00:00");
+const fmt = s => D(s).toLocaleDateString("en-US", { month:"short", day:"numeric" });
+const overlap = (a, b) => D(a.s) <= D(b.e) && D(b.s) <= D(a.e);
+
+// ---------- state ----------
+let state = null;
+function freshState() {
+  return {
+    cancelled: new Set(DEFAULT_CANCELLED),
+    crews: Object.fromEntries(SHOWS.map(s => [s.id, [...s.crew]])),
+  };
+}
+function encodeState() {
+  const o = { c: [...state.cancelled], r: {} };
+  SHOWS.forEach(s => {
+    const base = s.crew.join("|"), cur = state.crews[s.id].join("|");
+    if (base !== cur) o.r[s.id] = state.crews[s.id];
+  });
+  return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+function decodeState(h) {
+  try {
+    const o = JSON.parse(decodeURIComponent(escape(atob(h.replace(/-/g,"+").replace(/_/g,"/")))));
+    const st = freshState();
+    st.cancelled = new Set((o.c || []).filter(id => SHOWS.some(s => s.id === id)));
+    for (const id in (o.r || {})) if (st.crews[id]) st.crews[id] = o.r[id].filter(n => typeof n === "string").slice(0, 40);
+    return st;
+  } catch (e) { return null; }
+}
+function syncHash() {
+  history.replaceState(null, "", "#" + encodeState());
+}
+
+// ---------- derived ----------
+const activeShows = () => SHOWS.filter(s => !state.cancelled.has(s.id));
+function assignmentsOf(rep) { return activeShows().filter(s => state.crews[s.id].includes(rep)); }
+function conflictsOf(rep) {
+  const a = assignmentsOf(rep), out = [];
+  for (let i = 0; i < a.length; i++) for (let j = i + 1; j < a.length; j++)
+    if (overlap(a[i], a[j])) out.push([a[i], a[j]]);
+  return out;
+}
+function freedFrom(rep) { // cancelled shows this rep was originally on
+  return SHOWS.filter(s => state.cancelled.has(s.id) && s.crew.includes(rep));
+}
+function countClass(n) {
+  if (n === 0) return "zero";
+  if (n <= 3) return "lean";
+  return "";
+}
+function countColor(n) {
+  if (n <= 5) return "var(--seq-250)";
+  if (n <= 7) return "var(--seq-350)";
+  if (n <= 9) return "var(--seq-450)";
+  return "var(--seq-550)";
+}
+
+// ---------- actions ----------
+function addRep(showId, rep) {
+  if (!state.crews[showId].includes(rep)) { state.crews[showId].push(rep); commit(); }
+}
+function moveRep(fromId, showId, rep) {
+  if (fromId && fromId !== showId && !state.cancelled.has(fromId)) {
+    state.crews[fromId] = state.crews[fromId].filter(n => n !== rep);
+  }
+  addRep(showId, rep);
+}
+function removeRep(showId, rep) {
+  state.crews[showId] = state.crews[showId].filter(n => n !== rep);
+  commit();
+}
+function toggleCancel(showId) {
+  if (state.cancelled.has(showId)) state.cancelled.delete(showId);
+  else state.cancelled.add(showId);
+  commit();
+}
+function commit() { syncHash(); render(); }
+
+// ---------- drag & click-to-move ----------
+let dragInfo = null;   // {rep, from}
+let selected = null;   // {rep, from}
+function wouldConflict(showId, rep, from) {
+  const show = SHOWS.find(s => s.id === showId);
+  return assignmentsOf(rep)
+    .filter(s => s.id !== showId && !(from && s.id === from && !state.cancelled.has(from)))
+    .some(s => overlap(s, show));
+}
+function markTargets(rep, from) {
+  document.querySelectorAll(".card").forEach(c => {
+    const id = c.dataset.id;
+    if (state.cancelled.has(id) || state.crews[id].includes(rep)) return;
+    c.classList.add(wouldConflict(id, rep, from) ? "drop-warn" : "drop-ok");
+  });
+}
+function clearTargets() {
+  document.querySelectorAll(".card").forEach(c => c.classList.remove("drop-ok", "drop-warn"));
+}
+function chipDrag(el, rep, from) {
+  el.draggable = true;
+  el.addEventListener("dragstart", ev => {
+    dragInfo = { rep, from };
+    ev.dataTransfer.setData("text/plain", rep);
+    ev.dataTransfer.effectAllowed = "copyMove";
+    markTargets(rep, from);
+  });
+  el.addEventListener("dragend", () => { dragInfo = null; clearTargets(); });
+  el.addEventListener("click", ev => {
+    if (ev.target.classList.contains("x")) return;
+    if (selected && selected.rep === rep && selected.from === from) { selected = null; render(); return; }
+    selected = { rep, from };
+    render();
+    markTargets(rep, from);
+  });
+}
+
+// ---------- render ----------
+const board = document.getElementById("board");
+const bench = document.getElementById("bench");
+function el(tag, cls, parent, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+function render() {
+  board.replaceChildren();
+  bench.replaceChildren();
+
+  // board
+  let lastMonth = "";
+  SHOWS.forEach(show => {
+    const m = D(show.s).toLocaleDateString("en-US", { month: "long" });
+    if (m !== lastMonth) { el("div", "month-break", board, m); lastMonth = m; }
+
+    const cancelled = state.cancelled.has(show.id);
+    const crew = state.crews[show.id];
+    const card = el("div", "card" + (cancelled ? " cancelled" : ""), board);
+    card.dataset.id = show.id;
+
+    const head = el("div", "head", card);
+    const nameWrap = el("div", null, head);
+    el("div", "name", nameWrap, show.name);
+    el("div", "dates", nameWrap, fmt(show.s) + " – " + fmt(show.e));
+    if (show.booth) el("div", "booth", nameWrap, show.booth);
+    if (!cancelled) {
+      const n = crew.length;
+      const cnt = el("span", "count " + countClass(n), head, String(n));
+      if (!countClass(n)) cnt.style.background = countColor(n);
+    } else {
+      el("div", "cancel-note", head, "CANCELLED");
+    }
+
+    const chips = el("div", "chips", card);
+    crew.forEach(rep => {
+      const conf = !cancelled && conflictsOf(rep).some(([a, b]) => a.id === show.id || b.id === show.id);
+      const chip = el("span", "chip" + (conf ? " conflict" : "") + (cancelled ? " ghost" : ""), chips);
+      if (cancelled) {
+        // dim further once the rep is redeployed somewhere overlapping this show
+        const covered = assignmentsOf(rep).some(s => overlap(s, show));
+        if (covered) { chip.classList.add("covered"); chip.title = rep + " already redeployed during these dates"; }
+      }
+      if (selected && selected.rep === rep && selected.from === show.id) chip.classList.add("selected");
+      el("span", null, chip, rep);
+      if (conf) {
+        const others = conflictsOf(rep).flatMap(([a, b]) => [a, b]).filter(s => s.id !== show.id);
+        chip.title = rep + " is also on " + [...new Set(others.map(s => s.name))].join(", ") + " on overlapping dates";
+      }
+      if (!cancelled) {
+        const x = el("span", "x", chip, "×");
+        x.title = "Remove " + rep + " from " + show.name;
+        x.addEventListener("click", ev => { ev.stopPropagation(); removeRep(show.id, rep); });
+      }
+      chipDrag(chip, rep, show.id);
+    });
+    if (!cancelled && crew.length === 0) el("span", null, chips, "");
+
+    const conflictedHere = cancelled ? [] : crew.filter(rep => conflictsOf(rep).some(([a,b]) => a.id === show.id || b.id === show.id));
+    if (conflictedHere.length) el("div", "conflict-note", card, "⚠ Double-booked: " + conflictedHere.join(", "));
+    else if (show.note && !cancelled) el("div", "conflict-note", card, "").style.display = "none";
+
+    const btn = el("button", "toggle", card, cancelled ? "Restore show" : "Mark cancelled");
+    btn.addEventListener("click", () => toggleCancel(show.id));
+
+    // drop target
+    card.addEventListener("dragover", ev => { if (dragInfo && !state.cancelled.has(show.id)) ev.preventDefault(); });
+    card.addEventListener("drop", ev => {
+      ev.preventDefault();
+      if (!dragInfo || state.cancelled.has(show.id)) return;
+      moveRep(dragInfo.from, show.id, dragInfo.rep);
+      dragInfo = null; clearTargets();
+    });
+    card.addEventListener("click", ev => {
+      if (!selected || state.cancelled.has(show.id)) return;
+      if (ev.target.closest(".chip") || ev.target.closest(".toggle")) return;
+      const sel = selected; selected = null;
+      moveRep(sel.from, show.id, sel.rep);
+      clearTargets();
+    });
+  });
+
+  // bench
+  ALL_REPS.forEach(rep => {
+    const row = el("div", "bench-rep", bench);
+    const freed = freedFrom(rep);
+    const chip = el("span", "chip bench-chip", row, rep);
+    if (selected && selected.rep === rep && selected.from === null) chip.classList.add("selected");
+    chipDrag(chip, rep, null);
+    const s = el("span", "shows", row);
+    const parts = [];
+    assignmentsOf(rep).forEach(sh => parts.push(ABBR[sh.id]));
+    const span1 = el("span", null, s, parts.join(" · ") || "—");
+    if (freed.length) {
+      el("span", null, s, " ");
+      el("span", "freed", s, "freed: " + freed.map(f => ABBR[f.id]).join(", "));
+    }
+    if (conflictsOf(rep).length) { span1.style.color = "var(--serious)"; span1.style.fontWeight = "650"; }
+  });
+}
+
+// ---------- toolbar ----------
+document.getElementById("resetBtn").addEventListener("click", () => {
+  state = freshState(); selected = null; commit();
+});
+document.getElementById("copyBtn").addEventListener("click", async () => {
+  syncHash();
+  const url = location.href;
+  try { await navigator.clipboard.writeText(url); }
+  catch (e) { window.prompt("Copy this link:", url); }
+  const f = document.getElementById("flash");
+  f.style.display = "inline"; setTimeout(() => f.style.display = "none", 1600);
+});
+document.addEventListener("keydown", ev => {
+  if (ev.key === "Escape" && selected) { selected = null; clearTargets(); render(); }
+});
+
+// ---------- boot ----------
+state = (location.hash.length > 1 ? decodeState(location.hash.slice(1)) : null) || freshState();
+render();
+</script>
+</body>
+</html>
